@@ -2,13 +2,14 @@
 # Created on Tue Aug  7 10:29:59 2018
 # @author: Zhuorong Li  <lizr@zucc.edu.cn>
 
-# To get ImageNet classifiers ,run: 
+# To get pre-trained models used in this repository:
 # wget http://download.tensorflow.org/models/resnet_v2_50_2017_04_14.tar.gz
 # wget http://download.tensorflow.org/models/inception_v3_2016_08_28.tar.gz
 # wget http://download.tensorflow.org/models/vgg_16_2016_08_28.tar.gz
 # More pre-trained models can be found: https://github.com/tensorflow/models/tree/master/research/slim
 
 # MNIST dataset will be automatically downloaded after running the scripts.
+
 
 import numpy as np
 import os
@@ -22,7 +23,7 @@ from nets import vgg,inception,inception_v3,resnet_v2
 mnist = input_data.read_data_sets('./datasets/MNIST_data/', one_hot=True) 
 
 class Adversarial_Reprogramming(object):
-    def __init__(self, sess, network_name='resnet_v2_50',image_size=224, dataset='mnist',\
+    def __init__(self, sess, network_name='inception_v3',image_size=299, dataset='mnist',\
                        central_size=28,max_epoch=50,lr=0.05,save_freq=5, \
                        batch_size=50,lmd=2e-6,decay=0.96,\
                        train_dir='./train', model_dir='./model',data_dir='./datasets',sample_dir='./sample'):
@@ -41,18 +42,7 @@ class Adversarial_Reprogramming(object):
         self.model_dir=model_dir
         self.data_dir=data_dir
         self.sample_dir=sample_dir
-    
-    def net_fn(self,network_name):
-        if self.network_name == 'resnet_v2_50':
-            self.network = resnet_v2.resnet_v2_50
-            self.arg_sc = resnet_v2.resnet_arg_scope()
-        elif self.network_name == 'vgg_16':
-            self.network = vgg.vgg_16
-            self.arg_sc = vgg.vgg_arg_scope()
-        else:
-            self.network = inception_v3
-            self.arg_sc = inception.inception_v3_arg_scope()
-        return self.network,self.arg_sc
+
         
     def label_mapping(self):
             imagenet_label = np.zeros([1001,10])
@@ -103,15 +93,28 @@ class Adversarial_Reprogramming(object):
         Y = tf.placeholder(tf.float32, shape=[None, 10]) 
         
         ## load pretrained network
-        with slim.arg_scope(self.net_fn(self.network_name)[1]):
-            self.imagenet_logits,_ = self.network(self.adv_program(input_images), num_classes = 1001,is_training=False)
-            #print(self.imagenet_logits)#Tensor("resnet_v2_50/SpatialSqueeze:0", shape=(?, 1001), dtype=float32)
-            #print(self.label_mapping())#Tensor("Const_3:0", shape=(1001, 10), dtype=float32)
-            self.disturbed_logits = tf.matmul(self.imagenet_logits,self.label_mapping())
-            #print(self.disturbed_logits )#Tensor("MatMul:0", shape=(?, 10), dtype=float32)
-            
-            init_fn = slim.assign_from_checkpoint_fn(os.path.join(self.model_dir,self.network_name+'.ckpt'),\
-                                                     slim.get_model_variables(self.network_name))
+        
+        if self.network_name == 'inception_v3':
+            with slim.arg_scope(inception.inception_v3_arg_scope()):
+                self.imagenet_logits,_ = inception_v3.inception_v3(self.adv_program(input_images), num_classes = 1001,is_training=False)
+                #print(self.imagenet_logits)#Tensor("resnet_v2_50/SpatialSqueeze:0", shape=(?, 1001), dtype=float32)
+                self.disturbed_logits = tf.matmul(self.imagenet_logits,self.label_mapping())
+                #print(self.disturbed_logits )#Tensor("MatMul:0", shape=(?, 10), dtype=float32)
+                #print(self.label_mapping())#Tensor("Const_3:0", shape=(1001, 10), dtype=float32)
+                init_fn = slim.assign_from_checkpoint_fn(os.path.join(self.model_dir,self.network_name+'.ckpt'),\
+                                                         slim.get_model_variables('InceptionV3'))
+        elif self.network_name == 'resnet_v2_50':
+            with slim.arg_scope(resnet_v2.resnet_arg_scope()):
+                self.imagenet_logits,_ = resnet_v2.resnet_v2_50(self.adv_program(input_images), num_classes = 1001,is_training=False)
+                self.disturbed_logits = tf.matmul(self.imagenet_logits,self.label_mapping())
+                init_fn = slim.assign_from_checkpoint_fn(os.path.join(self.model_dir,self.network_name+'.ckpt'),\
+                                                         slim.get_model_variables('resnet_v2_50'))
+        else:
+            with slim.arg_scope(vgg.vgg_arg_scope()):
+                self.imagenet_logits,_ = vgg.vgg_16(self.adv_program(input_images), num_classes = 1001,is_training=False)
+                self.disturbed_logits = tf.matmul(self.imagenet_logits,self.label_mapping())
+                init_fn = slim.assign_from_checkpoint_fn(os.path.join(self.model_dir,self.network_name+'.ckpt'),\
+                                                         slim.get_model_variables('vgg_16'))
         
         ## loss function
         self.cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = Y,logits = self.disturbed_logits))
@@ -136,7 +139,7 @@ class Adversarial_Reprogramming(object):
         sess.run(tf.global_variables_initializer())
         init_fn(sess)
         
-        ## (restore if checkpoint flies exist)
+        ## (restore)
         ckpt = tf.train.get_checkpoint_state(self.train_dir)
         if ckpt and ckpt.model_checkpoint_path:
             saver.restore(sess,ckpt.model_checkpoint_path)
@@ -165,7 +168,21 @@ class Adversarial_Reprogramming(object):
                     scipy.misc.toimage(img_X_adv[j]).save(os.path.join(self.sample_dir,'epoch_{:06d}_{}.jpg'.format((epoch+1),j))) 
             epoch_duration =time()-epoch_start
             print("Training this epoch takes:","{:.2f}".format(epoch_duration))
-           
+          
+            ## Validate after each epoch
+            val_total_batch = int(len(mnist.validation.images)/self.batch_size) 
+            val_images = mnist.validation.images
+            val_images = np.reshape(val_images, [-1, 28, 28, 1])
+            val_labels = mnist.validation.labels
+            val_acc_sum = 0.0
+            for j in range(val_total_batch):
+                val_image_batch = val_images[j*self.batch_size:(j+1)*self.batch_size]
+                val_label_batch = val_labels[j*self.batch_size:(j+1)*self.batch_size]
+                val_batch_acc = sess.run(accuracy, feed_dict = {input_images:val_image_batch,Y:val_label_batch})
+                #print('val_batch_acc:{:.4f}'.format(j,val_batch_acc))
+                val_acc_sum += val_batch_acc
+            val_acc = float(val_acc_sum/val_total_batch)
+            print('val_acc:{:.4f}'.format(val_acc))
         training_duration = time()-training_start
         
         ## Test when training finished
