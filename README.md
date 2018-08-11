@@ -34,7 +34,9 @@ Then run:
 ```
 - More available networks can be found in the subfolder `./nets`, which is derived from [slim](https://github.com/tensorflow/models/tree/master/research/slim).
 - Checkpoint files will be saved in `./train` and you are able to continue training your model from the previous epoch. 
-- Sampled images can be found in `./sample`. 
+- Sampled images can be found in `./sample`. Following are the examples that repurposing the ImageNet classifiers ( in this case, ResNet_v2_50) to MNIST classficaion.
+
+<img src="imgs/adv_img_resnet_v2_50.jpg" width="600px"/>
 
 ## Test
 Test will be performed immediately after training finished.
