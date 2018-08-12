@@ -14,10 +14,12 @@ git clone git@github.com:lizhuorong/Adversarial-Reprogramming-tensorflow.git
 cd Adversarial-Reprogramming-tensorflow
 ```
 ### Download the imagenet models
+Download the following pre-trained models and put them into './model':
 - [resnet_v2_50](http://download.tensorflow.org/models/resnet_v2_50_2017_04_14.tar.gz)
 - [inception_v3](http://download.tensorflow.org/models/inception_v3_2016_08_28.tar.gz)
 - [vgg_16](http://download.tensorflow.org/models/vgg_16_2016_08_28.tar.gz)
 - More imagenet models can be found [here](https://github.com/tensorflow/models/tree/master/research/slim)
+
 ### Datasets
 - MNIST dataset will be automatically downloaded after running the scripts. 
 - CIFAR-10. Training on CIFAR-10 have not been implemented yet. However, it is easy to adapt to more datasets and imagenet models.
@@ -34,9 +36,9 @@ Then run:
 ```
 - More available networks can be found in the subfolder `./nets`, which is derived from [slim](https://github.com/tensorflow/models/tree/master/research/slim).
 - Checkpoint files will be saved in `./train` and you are able to continue training your model from the previous epoch. 
-- Sampled images can be found in `./sample`. Following are the examples that repurposing the ImageNet classifiers ( in this case, ResNet_v2_50) to MNIST classficaion.
+- Sampled images can be found in `./sample`. Following are the examples that repurposing the ImageNet classifiers to MNIST classficaion.  ( top: Inception_V3 ; bottom : Resnet_v2_50)
 
-<img src="imgs/adv_img_resnet_v2_50.jpg" width="600px"/>
+<img src="imgs/concat.jpg" width="600px"/>
 
 ## Test
 Test will be performed immediately after training finished.
