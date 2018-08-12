@@ -29,9 +29,9 @@ class Adversarial_Reprogramming(object):
                        train_dir='./train', model_dir='./model',data_dir='./datasets',sample_dir='./sample'):
         
         self.network_name=network_name
-        self.image_size=image_size
         self.dataset=dataset
         self.central_size=central_size
+        self.image_size=image_size
         self.max_epoch=max_epoch
         self.lr=lr
         self.batch_size=batch_size
@@ -42,7 +42,8 @@ class Adversarial_Reprogramming(object):
         self.model_dir=model_dir
         self.data_dir=data_dir
         self.sample_dir=sample_dir
-
+        if self.dataset == 'cifar':
+            self.central_size = 32
         
     def label_mapping(self):
             imagenet_label = np.zeros([1001,10])
@@ -50,12 +51,6 @@ class Adversarial_Reprogramming(object):
             return tf.constant(imagenet_label, dtype=tf.float32)  
     
     def adv_program(self,central_image):
-        
-        if self.dataset == 'mnist':
-            self.central_size = 28
-        else:
-            self.central_size = 32
-            
         if self.network_name.startswith('inception'):
             self.image_size = 299
             means = np.array([0.5, 0.5, 0.5], dtype=np.float32)
@@ -79,7 +74,7 @@ class Adversarial_Reprogramming(object):
                              [int((np.ceil(self.image_size/2.))-self.central_size/2.), int((np.floor(self.image_size/2.))-self.central_size/2.)], [0,0]]))
         self.P = tf.nn.tanh(tf.multiply(self.W, self.M))
         self.X_adv = self.X + self.P
-        
+            
         self.channels = tf.split(self.X_adv, axis=3, num_or_size_splits=3)
         for i in range(3):
             self.channels[i] -= means[i]
@@ -89,11 +84,10 @@ class Adversarial_Reprogramming(object):
         return self.X_adv
     
     def run(self):
-        
         if self.dataset == 'mnist':
             input_images  = tf.placeholder(shape = [None, 28,28,1], dtype = tf.float32)
         else:
-            input_images  = tf.placeholder(shape = [None, self.image_size,self.image_size,3], dtype = tf.float32)
+            input_images  = tf.placeholder(shape = [None, self.central_size,self.central_size,3], dtype = tf.float32)
         Y = tf.placeholder(tf.float32, shape=[None, 10]) 
         
         ## load ImageNet classifier
